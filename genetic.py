@@ -1,3 +1,4 @@
+#! /usr/bin/env python
 '''
 Genetic algorithm to select an optimal grouping of individuals based on their teammate preferences.
 '''
@@ -11,58 +12,86 @@ from time import localtime, strftime
 import signal
 import sys
 import time
+import argparse
+
+# Parse arguments to fill constants
+# This is to enable SPMD processing in the future
+# Changing any of the long argument strings will break the argument parsing system, so don't
+parser = argparse.ArgumentParser(description='Run a genetic algorithm to group participants into groups')
+parser.add_argument('-n', '--numparticipants', type=int, help="Number of participants for grouping exercise")
+parser.add_argument('-s', '--groupsize', type=int, help="Number of participants per group")
+parser.add_argument('-p', '--populationsize', type=int, help="Size of the population")
+parser.add_argument('-g', '--generations', type=int, help="Number of generations")
+parser.add_argument('-el', '--numelitism', type=int, help="Number of individuals in population that are from the previous elite")
+parser.add_argument('-rest', '--numrest', type=int, help="Number of randomly chosen non-elite parents")
+parser.add_argument('-pos', '--positiveweight',  type=int, help="(Testing) Weight assigned to a link between two willing group members")
+parser.add_argument('-neg', '--negativeweight', type=int, help="(Testing) Weight assigned to a link between two unwilling group members")
+parser.add_argument('-mchance', '--mutationchance', type=float, help="Chance of mutation for the next generation")
+parser.add_argument('-mswaps', '--mutationswaps', type=int, help="Number of group member swaps to do during each mutation (mutation aggressiveness)")
+parser.add_argument('-hof', '--numhalloffame', type=int, help="Number of individuals preserved in the hall of fame")
+parser.add_argument('-d', '--debug', action="store_true", help="Turns on debug printing")
+parser.add_argument('-nt', '--notest', action="store_true", help="Forces this out of test mode")
+parser.add_argument('-gh', '--graphhide', action="store_true", help="Do not show a summary graph at the end")
+args_dict = vars(parser.parse_args())
 
 # Parameters for the problem
-NUM_PARTICIPANTS = 30
-PARTICIPANTS_PER_GROUP = 3
+NUM_PARTICIPANTS = args_dict['numparticipants'] or 30
+PARTICIPANTS_PER_GROUP = args_dict['groupsize'] or 3
 assert(NUM_PARTICIPANTS % PARTICIPANTS_PER_GROUP == 0)
 NUM_GROUPS = int(NUM_PARTICIPANTS / PARTICIPANTS_PER_GROUP)
 
 # Parameters for the genetic algorithm
-POPULATION_SIZE = 1000
-NUM_GENERATIONS = 500
-NUM_ELITISM = int(POPULATION_SIZE / 4) # Keep these number of best-performing individuals for the rest of the algo
-NUM_REST_PARENTS = int(POPULATION_SIZE / 4) # The rest of the "non-elite" parents
+POPULATION_SIZE = args_dict['populationsize'] or 100
+NUM_GENERATIONS = args_dict['generations'] = 100
+NUM_ELITISM = args_dict['numelitism'] or int(POPULATION_SIZE / 4) # Keep these number of best-performing individuals for the rest of the algo
+NUM_REST_PARENTS = args_dict['numrest'] or int(POPULATION_SIZE / 4) # The rest of the "non-elite" parents
 NUM_CHILDREN = POPULATION_SIZE - NUM_ELITISM - NUM_REST_PARENTS
-POSITIVE_WEIGHT = 100
-NEGATIVE_WEIGHT = -1000
-MUTATION_CHANCE = 0.5
-MUTATION_NUM_SWAPS = 1#int(NUM_PARTICIPANTS / 5)
-HALL_OF_FAME_SIZE = 5
+POSITIVE_WEIGHT = args_dict['positiveweight'] or 100
+NEGATIVE_WEIGHT = args_dict['negativeweight'] or -1000
+MUTATION_CHANCE = args_dict['mutationchance'] or 0.1
+MUTATION_NUM_SWAPS = args_dict['mutationswaps'] or 1#int(NUM_PARTICIPANTS / 5)
+HALL_OF_FAME_SIZE = args_dict['numhalloffame'] or 5
 
 # Printing params
-DEBUG = False
+DEBUG = args_dict['debug'] or False
+NOTEST = args_dict['notest'] or False # Is a test by default
+GRAPHHIDE = args_dict['graphhide'] or False
 
 # Non-constants
+# Plotting params
+xs = []
+ys = []
 hall_of_fame = []
 ranking = [[NEGATIVE_WEIGHT for x in range(NUM_PARTICIPANTS)]
            for y in range(NUM_PARTICIPANTS)]
-'''
-# For groups of size 2
-for i in range(NUM_PARTICIPANTS):
-    ranking[i][i] = 0 # cannot rank yourself
-    if i % 2 == 0:
-        # really want the person 'next' to you (only one "correct answer")
-        ranking[i][i + 1] = POSITIVE_WEIGHT
-    else:
-        # really want the person 'next' to you (only one "correct answer")
-        ranking[i][i - 1] = POSITIVE_WEIGHT
-'''
-# For groups of size 3
-for i in range(NUM_PARTICIPANTS):
-    ranking[i][i] = 0 # cannot rank yourself (changing this from 0 is NOT ALLOWED)
-    if i % 3 == 0:
-        ranking[i][i + 1] = POSITIVE_WEIGHT
-        ranking[i][i + 2] = POSITIVE_WEIGHT
-    elif i % 3 == 1:
-        ranking[i][i + 1] = POSITIVE_WEIGHT
-        ranking[i][i - 1] = POSITIVE_WEIGHT
-    elif i % 3 == 2:
-        ranking[i][i - 1] = POSITIVE_WEIGHT
-        ranking[i][i - 2] = POSITIVE_WEIGHT
-    else:
-        assert(False)
+if PARTICIPANTS_PER_GROUP == 2 and (not NOTEST):
 
+    print("2!!!")
+    # For groups of size 2
+    for i in range(NUM_PARTICIPANTS):
+        ranking[i][i] = 0 # cannot rank yourself
+        if i % 2 == 0:
+            # really want the person 'next' to you (only one "correct answer")
+            ranking[i][i + 1] = POSITIVE_WEIGHT
+        else:
+            # really want the person 'next' to you (only one "correct answer")
+            ranking[i][i - 1] = POSITIVE_WEIGHT
+elif PARTICIPANTS_PER_GROUP == 3 and (not NOTEST):
+    print("3!!!")
+    # For groups of size 3
+    for i in range(NUM_PARTICIPANTS):
+        ranking[i][i] = 0 # cannot rank yourself (changing this from 0 is NOT ALLOWED)
+        if i % 3 == 0:
+            ranking[i][i + 1] = POSITIVE_WEIGHT
+            ranking[i][i + 2] = POSITIVE_WEIGHT
+        elif i % 3 == 1:
+            ranking[i][i + 1] = POSITIVE_WEIGHT
+            ranking[i][i - 1] = POSITIVE_WEIGHT
+        elif i % 3 == 2:
+            ranking[i][i - 1] = POSITIVE_WEIGHT
+            ranking[i][i - 2] = POSITIVE_WEIGHT
+        else:
+            assert(False)
 # Seed random?
 def is_valid_grouping(grouping):
     # number of groups must be correct
@@ -178,8 +207,6 @@ def breed_two_parents(p1, p2):
                 repeat_locations[participant] = [(groupidx, memberidx)]
             missing_participants = missing_participants - set([participant])
             
-    # repeat_locations = {k:v for (k,v) in repeat_locations.items() if len(v) > 1}
-    
     # For each set of repeats, save one repeat location each for each repeated participant, but the rest need to be overwritten (therefore we're taking a sample of len(v) - 1)
     repeat_locations = [random.sample(v, len(v) - 1) for (k,v) in repeat_locations.items() if len(v) > 1]
     # Flatten list
@@ -249,7 +276,8 @@ def exit_handler(sig, frame):
         plt.ylabel('Best Fitness Achieved', fontsize=16)
         plt.plot(xs, ys)
         fig.savefig('graphs/' + str(NUM_PARTICIPANTS) + 'p-' + str(NUM_GROUPS) + 'g-' + str(NUM_GENERATIONS) + 'gen-' + strftime("%Y-%m-%d--%H:%M:%S", localtime()) + '.png')
-        plt.show()
+        if not GRAPHHIDE:
+            plt.show()
         sys.exit(0)
 
 if __name__ == "__main__":
@@ -261,11 +289,6 @@ if __name__ == "__main__":
     print_population(population)
     print("Ranking:")
     print(ranking)
-
-    # Plotting params
-    xs = []
-    ys = []
-
 
     # Set up initial state for generations
     generation = 0
@@ -334,5 +357,6 @@ if __name__ == "__main__":
         # Move on to next generation
         generation += 1
 
+    # Comon exit point for signals and at end of algo
     exit_handler(None, None)
 
