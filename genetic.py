@@ -7,20 +7,20 @@ import copy
 import sys
 import matplotlib.pyplot as plt
 import matplotlib.animation as animation
-from time import gmtime, strftime
+from time import localtime, strftime
 import signal
 import sys
 import time
 
 # Parameters for the problem
 NUM_PARTICIPANTS = 30
-PARTICIPANTS_PER_GROUP = 2
+PARTICIPANTS_PER_GROUP = 3
 assert(NUM_PARTICIPANTS % PARTICIPANTS_PER_GROUP == 0)
 NUM_GROUPS = int(NUM_PARTICIPANTS / PARTICIPANTS_PER_GROUP)
 
 # Parameters for the genetic algorithm
 POPULATION_SIZE = 1000
-NUM_GENERATIONS = 10000
+NUM_GENERATIONS = 500
 NUM_ELITISM = int(POPULATION_SIZE / 4) # Keep these number of best-performing individuals for the rest of the algo
 NUM_REST_PARENTS = int(POPULATION_SIZE / 4) # The rest of the "non-elite" parents
 NUM_CHILDREN = POPULATION_SIZE - NUM_ELITISM - NUM_REST_PARENTS
@@ -37,6 +37,8 @@ DEBUG = False
 hall_of_fame = []
 ranking = [[NEGATIVE_WEIGHT for x in range(NUM_PARTICIPANTS)]
            for y in range(NUM_PARTICIPANTS)]
+'''
+# For groups of size 2
 for i in range(NUM_PARTICIPANTS):
     ranking[i][i] = 0 # cannot rank yourself
     if i % 2 == 0:
@@ -45,7 +47,21 @@ for i in range(NUM_PARTICIPANTS):
     else:
         # really want the person 'next' to you (only one "correct answer")
         ranking[i][i - 1] = POSITIVE_WEIGHT
-
+'''
+# For groups of size 3
+for i in range(NUM_PARTICIPANTS):
+    ranking[i][i] = 0 # cannot rank yourself (changing this from 0 is NOT ALLOWED)
+    if i % 3 == 0:
+        ranking[i][i + 1] = POSITIVE_WEIGHT
+        ranking[i][i + 2] = POSITIVE_WEIGHT
+    elif i % 3 == 1:
+        ranking[i][i + 1] = POSITIVE_WEIGHT
+        ranking[i][i - 1] = POSITIVE_WEIGHT
+    elif i % 3 == 2:
+        ranking[i][i - 1] = POSITIVE_WEIGHT
+        ranking[i][i - 2] = POSITIVE_WEIGHT
+    else:
+        assert(False)
 
 # Seed random?
 def is_valid_grouping(grouping):
@@ -144,8 +160,8 @@ def select_parents_to_breed(sorted_population_with_fitness):
 # Given two sets of groupings - we need to produce a new valid grouping
 def breed_two_parents(p1, p2):
     child = []
-    # Create a child between these two by randomly selecting groups from their pool
-    group_pool = copy.deepcopy(p1) + copy.deepcopy(list(p2))
+    # Custom copy and append (deepcopy profiling says it takes up the majority of runtime)
+    group_pool = [list(x) for x in p1] + [list(x) for x in p2] 
     child = random.sample(group_pool, NUM_GROUPS)
     #print("Initial child of " + str(p1) + " and " + str(p2) + ": \n" + str(child))
 
@@ -219,10 +235,6 @@ def create_new_halloffame(old_hof, sorted_population_with_fitness):
     old_hof.sort(key=lambda x: x[1])
     return old_hof[-HALL_OF_FAME_SIZE:]
 
-def animate(i):
-    ax1.clear()
-    ax1.plot(xs,ys)
-
 def exit_handler(sig, frame):
         print("\nEvolution complete or interrupted. \n")
         print("\n----- Final Hall Of Fame ----- ")
@@ -232,10 +244,11 @@ def exit_handler(sig, frame):
         fig = plt.figure(figsize=(8, 6))
         ax1 = fig.add_subplot(1,1,1)
         fig.suptitle('Fitness vs number of generations', fontsize=20)
+        ax1.set_title("N = " + str(NUM_PARTICIPANTS) + ", G = " + str(NUM_GROUPS) + ", NGEN = " + str(NUM_GENERATIONS) + ", POPSIZE = " + str(POPULATION_SIZE))
         plt.xlabel('Number of Generations', fontsize=16)
         plt.ylabel('Best Fitness Achieved', fontsize=16)
         plt.plot(xs, ys)
-        fig.savefig(str(NUM_PARTICIPANTS) + 'p-' + str(NUM_GROUPS) + 'g-' + str(NUM_GENERATIONS) + 'gen-' + strftime("%Y-%m-%d--%H:%M:%S", gmtime()) + '.png')
+        fig.savefig('graphs/' + str(NUM_PARTICIPANTS) + 'p-' + str(NUM_GROUPS) + 'g-' + str(NUM_GENERATIONS) + 'gen-' + strftime("%Y-%m-%d--%H:%M:%S", localtime()) + '.png')
         plt.show()
         sys.exit(0)
 
