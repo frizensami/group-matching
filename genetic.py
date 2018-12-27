@@ -1,11 +1,14 @@
-#! /usr/bin/env python
+#! /usr/bin/env python3
 '''
 Genetic algorithm to select an optimal grouping of individuals based on their teammate preferences.
 '''
+import sys
+if sys.version_info < (3, 0):
+    sys.stdout.write("Sorry, requires Python 3.x, not Python 2.x\n")
+    sys.exit(1)
 import random
 import itertools
 import copy
-import sys
 import matplotlib.pyplot as plt
 import matplotlib.animation as animation
 from time import localtime, strftime
@@ -13,6 +16,7 @@ import signal
 import sys
 import time
 import argparse
+import os
 
 # Parse arguments to fill constants
 # This is to enable SPMD processing in the future
@@ -32,6 +36,7 @@ parser.add_argument('-hof', '--numhalloffame', type=int, help="Number of individ
 parser.add_argument('-d', '--debug', action="store_true", help="Turns on debug printing")
 parser.add_argument('-nt', '--notest', action="store_true", help="Forces this out of test mode")
 parser.add_argument('-gh', '--graphhide', action="store_true", help="Do not show a summary graph at the end")
+parser.add_argument('-gd', '--graphdir', help="Indicates the directory to place graphs in")
 args_dict = vars(parser.parse_args())
 
 # Parameters for the problem
@@ -42,7 +47,7 @@ NUM_GROUPS = int(NUM_PARTICIPANTS / PARTICIPANTS_PER_GROUP)
 
 # Parameters for the genetic algorithm
 POPULATION_SIZE = args_dict['populationsize'] or 100
-NUM_GENERATIONS = args_dict['generations'] = 100
+NUM_GENERATIONS = args_dict['generations'] or 100
 NUM_ELITISM = args_dict['numelitism'] or int(POPULATION_SIZE / 4) # Keep these number of best-performing individuals for the rest of the algo
 NUM_REST_PARENTS = args_dict['numrest'] or int(POPULATION_SIZE / 4) # The rest of the "non-elite" parents
 NUM_CHILDREN = POPULATION_SIZE - NUM_ELITISM - NUM_REST_PARENTS
@@ -56,6 +61,7 @@ HALL_OF_FAME_SIZE = args_dict['numhalloffame'] or 5
 DEBUG = args_dict['debug'] or False
 NOTEST = args_dict['notest'] or False # Is a test by default
 GRAPHHIDE = args_dict['graphhide'] or False
+GRAPHDIR = args_dict['graphdir'] or 'graphs/'
 
 # Non-constants
 # Plotting params
@@ -65,8 +71,6 @@ hall_of_fame = []
 ranking = [[NEGATIVE_WEIGHT for x in range(NUM_PARTICIPANTS)]
            for y in range(NUM_PARTICIPANTS)]
 if PARTICIPANTS_PER_GROUP == 2 and (not NOTEST):
-
-    print("2!!!")
     # For groups of size 2
     for i in range(NUM_PARTICIPANTS):
         ranking[i][i] = 0 # cannot rank yourself
@@ -77,7 +81,6 @@ if PARTICIPANTS_PER_GROUP == 2 and (not NOTEST):
             # really want the person 'next' to you (only one "correct answer")
             ranking[i][i - 1] = POSITIVE_WEIGHT
 elif PARTICIPANTS_PER_GROUP == 3 and (not NOTEST):
-    print("3!!!")
     # For groups of size 3
     for i in range(NUM_PARTICIPANTS):
         ranking[i][i] = 0 # cannot rank yourself (changing this from 0 is NOT ALLOWED)
@@ -92,6 +95,9 @@ elif PARTICIPANTS_PER_GROUP == 3 and (not NOTEST):
             ranking[i][i - 2] = POSITIVE_WEIGHT
         else:
             assert(False)
+elif NOTEST:
+    print("Only test mode allowed for now (automatic fill-in of ranking info)")
+    assert(False)
 # Seed random?
 def is_valid_grouping(grouping):
     # number of groups must be correct
@@ -275,7 +281,8 @@ def exit_handler(sig, frame):
         plt.xlabel('Number of Generations', fontsize=16)
         plt.ylabel('Best Fitness Achieved', fontsize=16)
         plt.plot(xs, ys)
-        fig.savefig('graphs/' + str(NUM_PARTICIPANTS) + 'p-' + str(NUM_GROUPS) + 'g-' + str(NUM_GENERATIONS) + 'gen-' + strftime("%Y-%m-%d--%H:%M:%S", localtime()) + '.png')
+        os.makedirs(GRAPHDIR, exist_ok=True)
+        fig.savefig(GRAPHDIR + str(NUM_PARTICIPANTS) + 'p-' + str(NUM_GROUPS) + 'g-' + str(NUM_GENERATIONS) + 'gen-' + strftime("%Y-%m-%d--%H:%M:%S", localtime()) + '.png')
         if not GRAPHHIDE:
             plt.show()
         sys.exit(0)
