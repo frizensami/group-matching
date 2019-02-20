@@ -37,14 +37,13 @@ if __name__ == "__main__":
     print("Created directory {} for this test".format(test_dir))
 
     procs = []
-    gens_start = 500
-    gens_fx = lambda prevgen: prevgen * 2
-    cpus = 4
+    gens_start = 10
+    gens_fx = lambda prevgen: prevgen + 5
+    cpus = 8
     for cpu in range(cpus):
         logfilename = test_dir + str(cpu) + ".txt"
         proc = run_genetic(logfilename=logfilename, numparticipants=30, groupsize=3, populationsize=1000, generations=gens_start, numelitism=250, numrest=250, positiveweight=100, negativeweight=-1000, mutationchance=0.1, mutationswaps=1, numhalloffame=5, graphdir=test_dir + 'graphs/')
         gens_start = gens_fx(gens_start)
         print("Process #{} started".format(cpu))
     print("All processes started: exiting")
-
 

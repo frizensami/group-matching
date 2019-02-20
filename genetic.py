@@ -37,6 +37,7 @@ parser.add_argument('-d', '--debug', action="store_true", help="Turns on debug p
 parser.add_argument('-nt', '--notest', action="store_true", help="Forces this out of test mode")
 parser.add_argument('-gh', '--graphhide', action="store_true", help="Do not show a summary graph at the end")
 parser.add_argument('-gd', '--graphdir', help="Indicates the directory to place graphs in")
+parser.add_argument('-r', '--rankings', help="CSV file for rankings information")
 args_dict = vars(parser.parse_args())
 
 # Parameters for the problem
@@ -46,7 +47,7 @@ assert(NUM_PARTICIPANTS % PARTICIPANTS_PER_GROUP == 0)
 NUM_GROUPS = int(NUM_PARTICIPANTS / PARTICIPANTS_PER_GROUP)
 
 # Parameters for the genetic algorithm
-POPULATION_SIZE = args_dict['populationsize'] or 100
+POPULATION_SIZE = args_dict['populationsize'] or 1000
 NUM_GENERATIONS = args_dict['generations'] or 100
 NUM_ELITISM = args_dict['numelitism'] or int(POPULATION_SIZE / 4) # Keep these number of best-performing individuals for the rest of the algo
 NUM_REST_PARENTS = args_dict['numrest'] or int(POPULATION_SIZE / 4) # The rest of the "non-elite" parents
@@ -96,8 +97,17 @@ elif PARTICIPANTS_PER_GROUP == 3 and (not NOTEST):
         else:
             assert(False)
 elif NOTEST:
-    print("Only test mode allowed for now (automatic fill-in of ranking info)")
-    assert(False)
+    import csv
+    file_location = args_dict["rankings"] or "rankings.csv"
+    with open(file_location) as csvfile:
+        ranking = list(csv.reader(csvfile, delimiter=','))
+        for rowidx, row in enumerate(ranking):
+            for colidx, cell in enumerate(row):
+                ranking[rowidx][colidx] = int(ranking[rowidx][colidx])
+                print(cell, end=' ')
+            print("\n")
+    import time
+    # time.sleep(10)
 # Seed random?
 def is_valid_grouping(grouping):
     # number of groups must be correct
@@ -293,7 +303,7 @@ if __name__ == "__main__":
     population = generateInitialPopulation(POPULATION_SIZE)
     print()
     print("Initial population:")
-    print_population(population)
+    # print_population(population)
     print("Ranking:")
     print(ranking)
 
@@ -349,7 +359,6 @@ if __name__ == "__main__":
         # Just a check to make sure all of the new generation are valid groups
         assert(all(map(is_valid_grouping, new_population)))
 
-        # TODO: Display generation stats on a graph?
         best_fitness_so_far = hall_of_fame[-1][1]
         print("Best fitness at generation " + str(generation) + " = " + str(best_fitness_so_far))
         xs.append(generation)
