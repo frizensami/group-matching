@@ -38,6 +38,7 @@ parser.add_argument('-nt', '--notest', action="store_true", help="Forces this ou
 parser.add_argument('-gh', '--graphhide', action="store_true", help="Do not show a summary graph at the end")
 parser.add_argument('-gd', '--graphdir', help="Indicates the directory to place graphs in")
 parser.add_argument('-r', '--rankings', help="CSV file for rankings information")
+parser.add_argument('-b', '--bruteforce', action="store_true", help="Disable genetic algorithm and use bruteforce random search instead")
 args_dict = vars(parser.parse_args())
 
 # Parameters for the problem
@@ -45,6 +46,9 @@ NUM_PARTICIPANTS = args_dict['numparticipants'] or 30
 PARTICIPANTS_PER_GROUP = args_dict['groupsize'] or 3
 assert(NUM_PARTICIPANTS % PARTICIPANTS_PER_GROUP == 0)
 NUM_GROUPS = int(NUM_PARTICIPANTS / PARTICIPANTS_PER_GROUP)
+
+# Bruteforce random or genetic
+BRUTEFORCE = args_dict['bruteforce'] or False
 
 # Parameters for the genetic algorithm
 POPULATION_SIZE = args_dict['populationsize'] or 1000
@@ -280,8 +284,8 @@ def create_new_halloffame(old_hof, sorted_population_with_fitness):
 
 def exit_handler(sig, frame):
         print("\nEvolution complete or interrupted. \n")
-        print("\n----- Final Hall Of Fame ----- ")
-        print_population(hall_of_fame)
+        #print("\n----- Final Hall Of Fame ----- ")
+        #print_population(hall_of_fame)
 
         # Draw final results
         fig = plt.figure(figsize=(8, 6))
@@ -307,6 +311,12 @@ if __name__ == "__main__":
     print("Ranking:")
     print(ranking)
 
+
+    #test_fitness = list(map(lambda gs: (gs, fitness(gs)),[[[11, 2, 20], [1, 25, 15], [8, 19, 23], [22, 12, 16], [26, 14, 13], [18, 21, 17], [5, 3, 9], [0, 7, 10], [4, 24, 6]]]))
+    #print("TEST FITNESS")
+    #print(test_fitness)
+    #sys.exit(0)
+
     # Set up initial state for generations
     generation = 0
     best_match = ([], -sys.maxsize - 1)
@@ -329,37 +339,42 @@ if __name__ == "__main__":
             print_population(hall_of_fame)
 
         # Note a "best grouping"
-        # best_grouping = max(population_with_fitness, key=lambda x: x[1])
-        #if best_grouping[1] > best_match[1]:
-        #    best_match = copy.deepcopy(best_grouping)
+        best_grouping = max(population_with_fitness, key=lambda x: x[1])
+        if best_grouping[1] > best_match[1]:
+            best_match = copy.deepcopy(best_grouping)
 
-        parents = select_parents_to_breed(population_with_fitness)
-        if DEBUG:
-            print("Parents: " + str(parents))
+        if not BRUTEFORCE:
+            parents = select_parents_to_breed(population_with_fitness)
+            if DEBUG:
+                print("Parents: " + str(parents))
 
-        children = breed(parents)
-        if DEBUG:
-            print("Children: ")
-            print_population(children)
+            children = breed(parents)
+            if DEBUG:
+                print("Children: ")
+                print_population(children)
 
-        # Create new population, append parents and children together
-        new_population = []
-        new_population.extend(parents)
-        new_population.extend(children)
+            # Create new population, append parents and children together
+            new_population = []
+            new_population.extend(parents)
+            new_population.extend(children)
 
-        if DEBUG:
-            print("Pre-mutation: ")
-            print_population(new_population)
-        mutate(new_population)
-        if DEBUG:
-            print("Post-mutation: ")
-            print_population(new_population)
-        population = new_population
+            if DEBUG:
+                print("Pre-mutation: ")
+                print_population(new_population)
+            mutate(new_population)
+            if DEBUG:
+                print("Post-mutation: ")
+                print_population(new_population)
+            population = new_population
+            assert(all(map(is_valid_grouping, new_population)))
+        else:
+            # Bruteforce - no mutation
+            population = generateInitialPopulation(POPULATION_SIZE);
         
         # Just a check to make sure all of the new generation are valid groups
-        assert(all(map(is_valid_grouping, new_population)))
 
-        best_fitness_so_far = hall_of_fame[-1][1]
+        #best_fitness_so_far = hall_of_fame[-1][1]
+        best_fitness_so_far = best_match[1]#hall_of_fame[-1][1]
         print("Best fitness at generation " + str(generation) + " = " + str(best_fitness_so_far))
         xs.append(generation)
         ys.append(best_fitness_so_far)
@@ -372,7 +387,8 @@ if __name__ == "__main__":
 
         # Move on to next generation
         generation += 1
-
+    print("BEST MATCH")
+    print_population(best_match)
     # Comon exit point for signals and at end of algo
     exit_handler(None, None)
 
