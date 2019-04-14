@@ -17,3 +17,8 @@ To run with the exact arguments from the associated paper (Population Size = 100
 ```
 You will need a file called `rankings.csv` with a `n x n` matrix of preference values starting at the first row and first column. The value in row `i` and column `j` will refer to the rating given by the `i`th participant to the `j`th participant.
 
+There is some support for running multiple GA instances in parallel. Running:
+```
+./genetic-parallel.py
+```
+will execute a number of `./genetic.py` instances in parallel. This has no command-line arguments - all changes need to be made in the code itself currently. The call to `run_genetic(...)` and the variable `cpus` are the main points of modification. 
